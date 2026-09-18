@@ -28,6 +28,8 @@ const { default: AudioMenu } = require('./AudioMenu');
 const SpeedMenu = require('./SpeedMenu');
 const { default: SideDrawerButton } = require('./SideDrawerButton');
 const { default: SideDrawer } = require('./SideDrawer');
+const { default: WatchPartyMenu } = require('./WatchPartyMenu');
+const { default: useWatchParty } = require('./useWatchParty');
 const usePlayer = require('./usePlayer');
 const { default: usePlayOnDevice } = require('./usePlayOnDevice');
 const { default: useKeyboardSeek } = require('./useKeyboardSeek');
@@ -71,6 +73,26 @@ const Player = () => {
     const streamingServer = useStreamingServer();
     const statistics = useStatistics(player, streamingServer);
     const video = useVideo();
+    const watchPartyContentId = React.useMemo(() => {
+        const stream = player.selected?.stream;
+        if (!stream) {
+            return null;
+        }
+        if (typeof stream.infoHash === 'string') {
+            return `ih:${stream.infoHash}:${stream.fileIdx ?? ''}`;
+        }
+        if (typeof stream.url === 'string') {
+            return `url:${stream.url}`;
+        }
+        if (typeof stream.ytId === 'string') {
+            return `yt:${stream.ytId}`;
+        }
+        if (typeof stream.externalUrl === 'string') {
+            return `ext:${stream.externalUrl}`;
+        }
+        return null;
+    }, [player.selected?.stream]);
+    const watchParty = useWatchParty(video, watchPartyContentId);
     const routeFocused = useRouteFocused();
     const platform = usePlatform();
     const toast = useToast();
@@ -104,6 +126,7 @@ const Player = () => {
     const [speedMenuOpen, , closeSpeedMenu, toggleSpeedMenu] = useBinaryState(false);
     const [statisticsMenuOpen, openStatisticsMenu, closeStatisticsMenu, toggleStatisticsMenu] = useBinaryState(false);
     const [castDevicesMenuOpen, , closeCastDevicesMenu, toggleCastDevicesMenu] = useBinaryState(false);
+    const [watchPartyMenuOpen, , closeWatchPartyMenu, toggleWatchPartyMenu] = useBinaryState(false);
     const metaItemContent = player.metaItem !== null && player.metaItem.type === 'Ready' ? player.metaItem.content : null;
 
     const isEpg = (player.live ?? null) !== null;
@@ -128,8 +151,8 @@ const Player = () => {
     const [sideDrawerOpen, , closeSideDrawer, toggleSideDrawer] = useBinaryState(false);
 
     const menusOpen = React.useMemo(() => {
-        return optionsMenuOpen || subtitlesMenuOpen || audioMenuOpen || speedMenuOpen || statisticsMenuOpen || castDevicesMenuOpen || sideDrawerOpen || nextVideoPopupOpen;
-    }, [optionsMenuOpen, subtitlesMenuOpen, audioMenuOpen, speedMenuOpen, statisticsMenuOpen, castDevicesMenuOpen, sideDrawerOpen, nextVideoPopupOpen]);
+        return optionsMenuOpen || subtitlesMenuOpen || audioMenuOpen || speedMenuOpen || statisticsMenuOpen || castDevicesMenuOpen || sideDrawerOpen || nextVideoPopupOpen || watchPartyMenuOpen;
+    }, [optionsMenuOpen, subtitlesMenuOpen, audioMenuOpen, speedMenuOpen, statisticsMenuOpen, castDevicesMenuOpen, sideDrawerOpen, nextVideoPopupOpen, watchPartyMenuOpen]);
 
     const closeMenus = React.useCallback(() => {
         closeOptionsMenu();
@@ -138,6 +161,7 @@ const Player = () => {
         closeSpeedMenu();
         closeStatisticsMenu();
         closeCastDevicesMenu();
+        closeWatchPartyMenu();
         closeSideDrawer();
     }, []);
 
@@ -433,6 +457,9 @@ const Player = () => {
         }
         if (!event.nativeEvent.castDevicesMenuClosePrevented) {
             closeCastDevicesMenu();
+        }
+        if (!event.nativeEvent.watchPartyMenuClosePrevented) {
+            closeWatchPartyMenu();
         }
 
         closeSideDrawer();
@@ -1069,6 +1096,8 @@ const Player = () => {
                 onToggleOptionsMenu={toggleOptionsMenu}
                 shellCastSupported={shellCastSupported}
                 onToggleCastDevicesMenu={toggleCastDevicesMenu}
+                watchPartyActive={watchParty.state.status === 'connected'}
+                onToggleWatchPartyMenu={toggleWatchPartyMenu}
                 onToggleSubtitlesMenu={toggleSubtitlesMenu}
                 onToggleAudioMenu={toggleAudioMenu}
                 onToggleSpeedMenu={toggleSpeedMenu}
@@ -1115,6 +1144,20 @@ const Player = () => {
                     devices={castDevices}
                     loading={castDevicesLoading}
                     onDeviceSelected={onCastDeviceSelected}
+                />
+            </Transition>
+            <Transition when={watchPartyMenuOpen} name={'fade'}>
+                <WatchPartyMenu
+                    className={classnames(styles['layer'], styles['menu-layer'])}
+                    status={watchParty.state.status}
+                    roomId={watchParty.state.roomId}
+                    userName={watchParty.state.userName}
+                    peers={watchParty.state.peers}
+                    mismatch={watchParty.state.mismatch}
+                    error={watchParty.state.error}
+                    contentId={watchPartyContentId}
+                    onJoin={watchParty.join}
+                    onLeave={watchParty.leave}
                 />
             </Transition>
             <Transition when={sideDrawerOpen} name={'slide-left'}>

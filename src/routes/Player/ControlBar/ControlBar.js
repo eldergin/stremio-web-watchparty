@@ -47,6 +47,8 @@ const ControlBar = React.forwardRef(({
     onToggleOptionsMenu,
     shellCastSupported,
     onToggleCastDevicesMenu,
+    watchPartyActive,
+    onToggleWatchPartyMenu,
     videoScale,
     videoScaleLabel,
     live,
@@ -82,6 +84,9 @@ const ControlBar = React.forwardRef(({
     }, []);
     const onCastDevicesButtonMouseDown = React.useCallback((event) => {
         event.nativeEvent.castDevicesMenuClosePrevented = true;
+    }, []);
+    const onWatchPartyButtonMouseDown = React.useCallback((event) => {
+        event.nativeEvent.watchPartyMenuClosePrevented = true;
     }, []);
     const onPlayPauseButtonClick = React.useCallback(() => {
         if (paused) {
@@ -200,6 +205,9 @@ const ControlBar = React.forwardRef(({
                     <Button className={classnames(styles['control-bar-button'], { 'disabled': castButtonDisabled })} tabIndex={-1} onMouseDown={onCastDevicesButtonMouseDown} onClick={onChromecastButtonClick}>
                         <Icon className={styles['icon']} name={'cast'} />
                     </Button>
+                    <Button className={classnames(styles['control-bar-button'], { 'active': watchPartyActive })} title={'Watch Party'} tabIndex={-1} onMouseDown={onWatchPartyButtonMouseDown} onClick={onToggleWatchPartyMenu}>
+                        <Icon className={styles['icon']} name={'share'} />
+                    </Button>
                     <Button className={classnames(styles['control-bar-button'], { 'disabled': !Array.isArray(subtitlesTracks) || subtitlesTracks.length === 0 })} tabIndex={-1} onMouseDown={onSubtitlesButtonMouseDown} onClick={onToggleSubtitlesMenu}>
                         <Icon className={styles['icon']} name={'subtitles'} />
                     </Button>
@@ -262,6 +270,8 @@ ControlBar.propTypes = {
     onToggleOptionsMenu: PropTypes.func,
     shellCastSupported: PropTypes.bool,
     onToggleCastDevicesMenu: PropTypes.func,
+    watchPartyActive: PropTypes.bool,
+    onToggleWatchPartyMenu: PropTypes.func,
     onToggleStatisticsMenu: PropTypes.func,
     onMouseOver: PropTypes.func,
     onMouseMove: PropTypes.func,
