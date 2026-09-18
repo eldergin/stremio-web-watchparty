@@ -126,7 +126,16 @@ const Player = () => {
     const [speedMenuOpen, , closeSpeedMenu, toggleSpeedMenu] = useBinaryState(false);
     const [statisticsMenuOpen, openStatisticsMenu, closeStatisticsMenu, toggleStatisticsMenu] = useBinaryState(false);
     const [castDevicesMenuOpen, , closeCastDevicesMenu, toggleCastDevicesMenu] = useBinaryState(false);
-    const [watchPartyMenuOpen, , closeWatchPartyMenu, toggleWatchPartyMenu] = useBinaryState(false);
+    const [watchPartyMenuOpen, openWatchPartyMenu, closeWatchPartyMenu, toggleWatchPartyMenu] = useBinaryState(false);
+    const inviteRoomId = queryParams.get('wp');
+
+    React.useEffect(() => {
+        if (inviteRoomId) {
+            openWatchPartyMenu();
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [inviteRoomId]);
+
     const metaItemContent = player.metaItem !== null && player.metaItem.type === 'Ready' ? player.metaItem.content : null;
 
     const isEpg = (player.live ?? null) !== null;
@@ -1156,6 +1165,7 @@ const Player = () => {
                     mismatch={watchParty.state.mismatch}
                     error={watchParty.state.error}
                     contentId={watchPartyContentId}
+                    inviteRoomId={inviteRoomId}
                     onJoin={watchParty.join}
                     onLeave={watchParty.leave}
                 />

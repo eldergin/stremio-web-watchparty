@@ -20,18 +20,26 @@ type Props = {
     mismatch: boolean,
     error: string | null,
     contentId: string | null,
+    inviteRoomId?: string | null,
     onJoin: (serverUrl: string, roomId: string, userName: string) => void,
     onLeave: () => void,
 };
 
 const DEFAULT_SERVER_URL = 'https://weights-decisions-boxing-litigation.trycloudflare.com';
 
+const buildInviteLink = (roomId: string): string => {
+    const hash = window.location.hash || '';
+    const separator = hash.includes('?') ? '&' : '?';
+    return `${window.location.origin}${window.location.pathname}${hash}${separator}wp=${encodeURIComponent(roomId)}`;
+};
+
 const WatchPartyMenu = React.forwardRef<HTMLDivElement, Props>(({
-    className, status, roomId, userName, peers, mismatch, error, contentId, onJoin, onLeave,
+    className, status, roomId, userName, peers, mismatch, error, contentId, inviteRoomId, onJoin, onLeave,
 }, ref) => {
     const [serverUrl, setServerUrl] = useState(DEFAULT_SERVER_URL);
-    const [roomInput, setRoomInput] = useState(randomPokemonRoomName);
+    const [roomInput, setRoomInput] = useState(inviteRoomId || randomPokemonRoomName);
     const [nameInput, setNameInput] = useState('');
+    const [linkCopied, setLinkCopied] = useState(false);
 
     const onMouseDown = useCallback((event: React.MouseEvent) => {
         (event.nativeEvent as unknown as { watchPartyMenuClosePrevented?: boolean }).watchPartyMenuClosePrevented = true;
@@ -44,6 +52,18 @@ const WatchPartyMenu = React.forwardRef<HTMLDivElement, Props>(({
         onJoin(serverUrl.trim(), roomInput.trim(), nameInput.trim());
     }, [serverUrl, roomInput, nameInput, onJoin]);
 
+    const onCopyLinkClick = useCallback(() => {
+        if (!roomId) {
+            return;
+        }
+        navigator.clipboard.writeText(buildInviteLink(roomId))
+            .then(() => {
+                setLinkCopied(true);
+                setTimeout(() => setLinkCopied(false), 2000);
+            })
+            .catch(() => {});
+    }, [roomId]);
+
     const connected = status === 'connected';
 
     return (
@@ -54,7 +74,9 @@ const WatchPartyMenu = React.forwardRef<HTMLDivElement, Props>(({
                 !connected ?
                     <div className={styles['join-form']}>
                         <label className={styles['label']}>Room code</label>
-                        <div className={styles['hint']}>Share this to invite, or type someone else's to join them</div>
+                        <div className={styles['hint']}>
+                            { inviteRoomId ? 'You were invited to this room — just add your name' : "Share this to invite, or type someone else's to join them" }
+                        </div>
                         <TextInput
                             className={styles['input']}
                             value={roomInput}
@@ -111,6 +133,11 @@ const WatchPartyMenu = React.forwardRef<HTMLDivElement, Props>(({
                                 ))
                             }
                         </div>
+                        <Button className={styles['copy-link-button']} title={'Copy invite link'} onClick={onCopyLinkClick}>
+                            <div className={styles['copy-link-button-label']}>
+                                { linkCopied ? 'Copied!' : 'Copy invite link' }
+                            </div>
+                        </Button>
                         <Button className={styles['leave-button']} title={'Leave'} onClick={onLeave}>
                             <div className={styles['leave-button-label']}>Leave room</div>
                         </Button>

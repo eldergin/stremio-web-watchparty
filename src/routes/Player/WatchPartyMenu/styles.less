@@ -53,7 +53,7 @@
         flex-direction: column;
     }
 
-    .join-button, .leave-button {
+    .join-button, .leave-button, .copy-link-button {
         display: flex;
         align-items: center;
         justify-content: center;
@@ -68,7 +68,12 @@
         }
     }
 
-    .join-button-label, .leave-button-label {
+    .copy-link-button {
+        background-color: var(--overlay-color);
+        margin-top: 0.75rem;
+    }
+
+    .join-button-label, .leave-button-label, .copy-link-button-label {
         color: var(--primary-foreground-color);
         font-weight: 600;
         font-size: 0.9rem;
