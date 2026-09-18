@@ -24,7 +24,7 @@ type Props = {
     onLeave: () => void,
 };
 
-const DEFAULT_SERVER_URL = 'http://localhost:3001';
+const DEFAULT_SERVER_URL = 'https://weights-decisions-boxing-litigation.trycloudflare.com';
 
 const WatchPartyMenu = React.forwardRef<HTMLDivElement, Props>(({
     className, status, roomId, userName, peers, mismatch, error, contentId, onJoin, onLeave,
