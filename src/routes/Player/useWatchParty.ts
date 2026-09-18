@@ -243,6 +243,18 @@ const useWatchParty = (video: VideoLike, contentId: string | null) => {
         };
     }, []);
 
+    // let a browser extension (if installed) know the current room status,
+    // so it can offer quick re-join / room history outside the page itself
+    useEffect(() => {
+        window.postMessage({
+            source: 'stremio-watchparty',
+            roomId: state.roomId,
+            contentId: contentIdRef.current,
+            status: state.status,
+            userName: state.userName,
+        }, window.location.origin);
+    }, [state.status, state.roomId, state.userName]);
+
     return { state, join, leave };
 };
 
