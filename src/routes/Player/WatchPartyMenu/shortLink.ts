@@ -16,7 +16,7 @@ const createShortLink = async (serverUrl: string, longUrl: string): Promise<stri
         }
         const { code } = await response.json();
         return typeof code === 'string' && code ? `${window.location.origin}/?s=${encodeURIComponent(code)}` : null;
-    } catch (e) {
+    } catch {
         return null;
     }
 };
@@ -36,7 +36,7 @@ const resolveShortLink = async (serverUrl: string = DEFAULT_SERVER_URL): Promise
         if (typeof url === 'string' && url.startsWith(window.location.origin)) {
             window.location.replace(url);
         }
-    } catch (e) {
+    } catch {
         // leave the page as is; the app just opens normally
     }
 };
