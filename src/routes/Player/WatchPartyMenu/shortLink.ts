@@ -1,6 +1,6 @@
 // Copyright (C) 2017-2026 Smart code 203358507
 
-const DEFAULT_SERVER_URL = 'https://weights-decisions-boxing-litigation.trycloudflare.com';
+const DEFAULT_SERVER_URL = 'https://differ-dropped-shower-eternal.trycloudflare.com';
 
 // asks the sync server to store the (very long) invite url under a short code;
 // resolves to a short link, or null so callers can fall back to the full url
