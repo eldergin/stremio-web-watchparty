@@ -39,10 +39,10 @@ type IncomingPeerState = {
 // how often we broadcast our position while playing
 const HEARTBEAT_INTERVAL = 5000;
 // a play/pause change from a peer re-aligns us if we are further apart than this
-const STATE_CHANGE_ALIGN_THRESHOLD = 1500;
+const STATE_CHANGE_ALIGN_THRESHOLD = 500;
 // heartbeat drift correction: we only ever jump FORWARD to a peer who is this far ahead,
 // never back, so nobody gets rolled back and two peers can't ping-pong each other
-const HEARTBEAT_CATCHUP_THRESHOLD = 4000;
+const HEARTBEAT_CATCHUP_THRESHOLD = 2000;
 // after we apply a remote update, ignore our own resulting paused change for this long
 // so we don't echo the update we just received back to the room
 const REMOTE_APPLY_GUARD_MS = 1000;
