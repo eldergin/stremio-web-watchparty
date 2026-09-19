@@ -4,6 +4,7 @@ import React, { useCallback, useState } from 'react';
 import classNames from 'classnames';
 import { Button, TextInput } from 'stremio/components';
 import { randomPokemonRoomName } from './pokemonRoomNames';
+import { DEFAULT_SERVER_URL, createShortLink } from './shortLink';
 import styles from './styles.less';
 
 type Peer = {
@@ -24,8 +25,6 @@ type Props = {
     onJoin: (serverUrl: string, roomId: string, userName: string) => void,
     onLeave: () => void,
 };
-
-const DEFAULT_SERVER_URL = 'https://weights-decisions-boxing-litigation.trycloudflare.com';
 
 const buildInviteLink = (roomId: string): string => {
     const hash = window.location.hash || '';
@@ -56,13 +55,15 @@ const WatchPartyMenu = React.forwardRef<HTMLDivElement, Props>(({
         if (!roomId) {
             return;
         }
-        navigator.clipboard.writeText(buildInviteLink(roomId))
+        const longUrl = buildInviteLink(roomId);
+        createShortLink(serverUrl.trim(), longUrl)
+            .then((shortUrl) => navigator.clipboard.writeText(shortUrl || longUrl))
             .then(() => {
                 setLinkCopied(true);
                 setTimeout(() => setLinkCopied(false), 2000);
             })
             .catch(() => {});
-    }, [roomId]);
+    }, [roomId, serverUrl]);
 
     const connected = status === 'connected';
 

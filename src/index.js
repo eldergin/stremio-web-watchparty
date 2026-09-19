@@ -21,6 +21,9 @@ const App = require('./App');
 const { default: WebUpdateScreen } = require('./App/WebUpdateScreen');
 const { CoreProvider } = require('./core');
 const { FileDropProvider, PlatformProvider } = require('./common');
+const { resolveShortLink } = require('./routes/Player/WatchPartyMenu/shortLink');
+
+resolveShortLink();
 
 const translations = Object.fromEntries(Object.entries(stremioTranslations()).map(([key, value]) => [key, {
     translation: value
