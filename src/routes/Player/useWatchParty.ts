@@ -27,7 +27,6 @@ type VideoLike = {
     },
     setTime: (time: number) => void,
     setPaused: (paused: boolean) => void,
-    setPlaybackSpeed: (speed: number) => void,
 };
 
 type IncomingPeerState = {
@@ -37,23 +36,16 @@ type IncomingPeerState = {
     from: string,
 };
 
-// how often we broadcast our state to peers while playing, so late drift gets corrected
-// even without an explicit seek
+// how often we broadcast our position while playing
 const HEARTBEAT_INTERVAL = 5000;
-// a local time jump bigger than this (beyond what elapsed wall-clock time explains) is
-// treated as a manual seek rather than normal playback progression
-const SEEK_JUMP_THRESHOLD = 1500;
-// remote/local time difference bigger than this snaps to the remote time directly
-const HARD_SYNC_THRESHOLD = 3000;
-// remote/local time difference smaller than this is considered "in sync", no correction
-const SOFT_SYNC_THRESHOLD = 400;
-// how much we nudge playbackSpeed to close small gaps without a visible seek
-const SOFT_SYNC_SPEED_DELTA = 0.1;
-// safety cap so a soft-sync nudge never gets stuck at non-1x speed
-const SOFT_SYNC_MAX_DURATION = 8000;
-// after we apply a remote update, ignore our own resulting propChanged events for this long
-// so we don't immediately echo the update we just received back to the room
-const REMOTE_APPLY_GUARD_MS = 400;
+// a play/pause change from a peer re-aligns us if we are further apart than this
+const STATE_CHANGE_ALIGN_THRESHOLD = 1500;
+// heartbeat drift correction: we only ever jump FORWARD to a peer who is this far ahead,
+// never back, so nobody gets rolled back and two peers can't ping-pong each other
+const HEARTBEAT_CATCHUP_THRESHOLD = 4000;
+// after we apply a remote update, ignore our own resulting paused change for this long
+// so we don't echo the update we just received back to the room
+const REMOTE_APPLY_GUARD_MS = 1000;
 
 const INITIAL_STATE: WatchPartyState = {
     status: 'idle',
@@ -72,8 +64,6 @@ const useWatchParty = (video: VideoLike, contentId: string | null) => {
     const videoRef = useRef(video);
     const contentIdRef = useRef(contentId);
     const remoteApplyUntilRef = useRef(0);
-    const softSyncRef = useRef<{ active: boolean, until: number }>({ active: false, until: 0 });
-    const lastLocalTimeRef = useRef<{ time: number | null, ts: number }>({ time: null, ts: Date.now() });
     const heartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
     videoRef.current = video;
@@ -81,51 +71,37 @@ const useWatchParty = (video: VideoLike, contentId: string | null) => {
 
     const isRemoteApplying = useCallback(() => Date.now() < remoteApplyUntilRef.current, []);
 
-    const stopSoftSync = useCallback(() => {
-        if (softSyncRef.current.active) {
-            softSyncRef.current = { active: false, until: 0 };
-            videoRef.current.setPlaybackSpeed(1);
-        }
-    }, []);
-
+    // Clocks of different machines are never compared: we only use the position the peer
+    // reported, not its timestamp.
     const applyRemoteState = useCallback((data: IncomingPeerState) => {
         const v = videoRef.current;
         const isStateMessage = typeof data.paused === 'boolean';
 
-        remoteApplyUntilRef.current = Date.now() + REMOTE_APPLY_GUARD_MS;
-
         if (!isStateMessage) {
-            // explicit seek from a peer: authoritative, apply instantly
-            stopSoftSync();
+            // explicit seek from a peer: authoritative
+            remoteApplyUntilRef.current = Date.now() + REMOTE_APPLY_GUARD_MS;
             v.setTime(data.time);
             return;
         }
 
+        const localTime = v.state.time;
+
         if (v.state.paused !== data.paused) {
-            v.setPaused(data.paused);
-        }
-
-        const elapsedSinceSent = data.paused ? 0 : Math.max(0, Date.now() - data.ts);
-        const expectedTime = data.time + elapsedSinceSent;
-        const localTime = v.state.time ?? expectedTime;
-        const diff = expectedTime - localTime;
-
-        if (Math.abs(diff) > HARD_SYNC_THRESHOLD) {
-            stopSoftSync();
-            v.setTime(expectedTime);
+            // play/pause toggled by a peer
+            remoteApplyUntilRef.current = Date.now() + REMOTE_APPLY_GUARD_MS;
+            v.setPaused(data.paused as boolean);
+            if (localTime === null || Math.abs(data.time - localTime) > STATE_CHANGE_ALIGN_THRESHOLD) {
+                v.setTime(data.time);
+            }
             return;
         }
 
-        if (data.paused || Math.abs(diff) <= SOFT_SYNC_THRESHOLD) {
-            stopSoftSync();
-            return;
+        // heartbeat: only catch up to a peer who is well ahead of us
+        if (!data.paused && localTime !== null && data.time - localTime > HEARTBEAT_CATCHUP_THRESHOLD) {
+            remoteApplyUntilRef.current = Date.now() + REMOTE_APPLY_GUARD_MS;
+            v.setTime(data.time);
         }
-
-        // small drift: nudge speed briefly instead of a visible seek
-        const speed = diff > 0 ? 1 + SOFT_SYNC_SPEED_DELTA : 1 - SOFT_SYNC_SPEED_DELTA;
-        softSyncRef.current = { active: true, until: Date.now() + SOFT_SYNC_MAX_DURATION };
-        v.setPlaybackSpeed(speed);
-    }, [stopSoftSync]);
+    }, []);
 
     const join = useCallback((serverUrl: string, roomId: string, userName: string) => {
         if (socketRef.current) {
@@ -168,9 +144,8 @@ const useWatchParty = (video: VideoLike, contentId: string | null) => {
             socketRef.current.disconnect();
             socketRef.current = null;
         }
-        stopSoftSync();
         setState(INITIAL_STATE);
-    }, [stopSoftSync]);
+    }, []);
 
     // outgoing: paused/play toggled locally -> tell the room immediately
     useEffect(() => {
@@ -185,23 +160,14 @@ const useWatchParty = (video: VideoLike, contentId: string | null) => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [video.state.paused]);
 
-    // outgoing: local time jumped more than normal playback would explain -> it's a seek
-    useEffect(() => {
-        const prev = lastLocalTimeRef.current;
-        const now = Date.now();
-        const time = video.state.time;
-
-        if (time !== null && prev.time !== null && !isRemoteApplying()) {
-            const dTime = time - prev.time;
-            const dWall = now - prev.ts;
-            if (Math.abs(dTime - dWall) > SEEK_JUMP_THRESHOLD) {
-                socketRef.current?.connected && socketRef.current.emit('seek', { time: Math.round(time), ts: now });
-            }
+    // outgoing: the user explicitly seeked -> tell the room. Called from the player's single
+    // user-seek entry point, so buffering stalls and remote-applied jumps never get echoed.
+    const announceSeek = useCallback((time: number) => {
+        const socket = socketRef.current;
+        if (socket?.connected) {
+            socket.emit('seek', { time: Math.round(time), ts: Date.now() });
         }
-
-        lastLocalTimeRef.current = { time, ts: now };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [video.state.time]);
+    }, []);
 
     // periodic heartbeat while connected, so drift gets corrected even without an explicit action
     useEffect(() => {
@@ -220,10 +186,6 @@ const useWatchParty = (video: VideoLike, contentId: string | null) => {
                 return;
             }
             socket.emit('state', { time: Math.round(v.state.time), paused: v.state.paused, ts: Date.now() });
-
-            if (softSyncRef.current.active && Date.now() > softSyncRef.current.until) {
-                stopSoftSync();
-            }
         }, HEARTBEAT_INTERVAL);
 
         return () => {
@@ -232,14 +194,11 @@ const useWatchParty = (video: VideoLike, contentId: string | null) => {
                 heartbeatRef.current = null;
             }
         };
-    }, [state.status, isRemoteApplying, stopSoftSync]);
+    }, [state.status, isRemoteApplying]);
 
     useEffect(() => {
         return () => {
             socketRef.current?.disconnect();
-            if (softSyncRef.current.active) {
-                videoRef.current.setPlaybackSpeed(1);
-            }
         };
     }, []);
 
@@ -255,7 +214,7 @@ const useWatchParty = (video: VideoLike, contentId: string | null) => {
         }, window.location.origin);
     }, [state.status, state.roomId, state.userName]);
 
-    return { state, join, leave };
+    return { state, join, leave, announceSeek };
 };
 
 export default useWatchParty;

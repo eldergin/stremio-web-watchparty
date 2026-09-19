@@ -340,8 +340,9 @@ const Player = () => {
         }
         const target = Math.max(seekStart, Math.min(seekEnd, time));
         video.setTime(target);
+        watchParty.announceSeek(target);
         seek(target, video.state.duration, video.state.manifest?.name);
-    }, [canSeek, seekStart, seekEnd, video.state.duration, video.state.manifest]);
+    }, [canSeek, seekStart, seekEnd, video.state.duration, video.state.manifest, watchParty.announceSeek]);
     const {
         time: keyboardSeekTime,
         seekBy: seekByKeyboard,
